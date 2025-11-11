@@ -1,24 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// 1. **Varijable stanja:**
-//     - `address public owner` – adresa vlasnika (onaj koji je deployao ugovor)
-//     - `uint public goal` – cilj prikupljanja u wei
-//     - `uint public deadline` – vrijeme do kojeg traje kampanja
-//     - `uint public totalRaised` – ukupno prikupljeni iznos
-//     - `bool public goalReached` i `bool public fundsWithdrawn` – status kampanje
-// 2. **Funkcionalnosti:**
-//     - `constructor(uint _goal, uint _durationMinutes)` – postavlja vlasnika, cilj (u etherima) i trajanje kampanje
-//     - `donate()` – `payable` funkcija za uplate; bilježi uplatitelja i iznos, povećava `totalRaised`
-//     - `withdrawFunds()` – omogućuje **vlasniku** da povuče sredstva **ako je cilj postignut** i kampanja završila
-//     - `refund()` – omogućuje korisnicima povrat uplaćenih sredstava ako **kampanja nije uspjela**
-//     - `getBalance()` – vraća trenutačni balans ugovora
-//     - `getTimeLeft()` – prikazuje koliko sekundi je ostalo do kraja kampanje
-// 3. **Dodatno:**
-//     - Koristite `require` provjere gdje je potrebno (npr. za autorizaciju i vremenske uvjete).
-//     - Emitirajte `event`e za donaciju, povlačenje sredstava i refundiranje.
-//     - Koristite `modifier`e za provjeru vlasništva i status kampanje.
-
 contract CrowdFund {
     address public owner;
     uint public goal;
@@ -42,6 +24,11 @@ contract CrowdFund {
         _;
     }
 
+    modifier campaignNotEnded {
+        require(block.timestamp < deadline);
+        _;
+    }
+
     constructor(uint _goal, uint _durationMinutes) {
         require(_durationMinutes > 0);
         goal = _goal;
@@ -49,18 +36,17 @@ contract CrowdFund {
         owner = msg.sender;
     }
 
-    function donate(address sender, uint amount) payable public {
-        if (sender.balance < amount) revert("Insufficient balance");
-        if (block.timestamp > deadline) revert("Campaign has ended");
+    function donate(uint amount) payable public campaignNotEnded {
+        if (address(msg.sender).balance < amount) revert("Insufficient balance");
 
         totalRaised += amount;
         goalReached = totalRaised >= goal;
         donations[msg.sender] += amount;
-        emit DonationReceived(sender, amount);
+        emit DonationReceived(msg.sender, amount);
     }
 
-    function withdrawFunds() public onlyOwner notWithdrawn {
-        require(goalReached && block.timestamp > deadline);
+    function withdrawFunds() public onlyOwner notWithdrawn campaignNotEnded {
+        require(goalReached);
 
         payable(msg.sender).transfer(totalRaised);
         fundsWithdrawn = true;
@@ -68,9 +54,8 @@ contract CrowdFund {
         emit FundsWithdrawn(msg.sender, totalRaised);
     }
 
-    function refund() payable public {
+    function refund() payable public campaignNotEnded {
         require(!goalReached);
-        require(block.timestamp > deadline);
 
         uint amount = donations[msg.sender];
         require(amount > 0, "No donation to refund");
@@ -85,10 +70,7 @@ contract CrowdFund {
         return address(this).balance;
     }
 
-    function getTimeLeft() public view returns (uint) {
-        if (block.timestamp > deadline) {
-            return 0;
-        }
+    function getTimeLeft() public view campaignNotEnded returns (uint) {
         return deadline - block.timestamp;
     }
 }
