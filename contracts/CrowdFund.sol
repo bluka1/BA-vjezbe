@@ -45,7 +45,7 @@ contract CrowdFund {
         emit DonationReceived(msg.sender, amount);
     }
 
-    function withdrawFunds() public onlyOwner notWithdrawn campaignNotEnded {
+    function withdrawFunds() public payable onlyOwner notWithdrawn campaignNotEnded {
         require(goalReached);
 
         payable(msg.sender).transfer(totalRaised);
