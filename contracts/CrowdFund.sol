@@ -29,6 +29,11 @@ contract CrowdFund {
         _;
     }
 
+    modifier campaignEnded {
+        require(block.timestamp >= deadline);
+        _;
+    }
+
     constructor(uint _goal, uint _durationMinutes) {
         require(_durationMinutes > 0);
         goal = _goal;
@@ -36,26 +41,27 @@ contract CrowdFund {
         owner = msg.sender;
     }
 
-    function donate(uint amount) payable public campaignNotEnded {
-        if (address(msg.sender).balance < amount) revert("Insufficient balance");
+    function donate() payable public campaignNotEnded {
+        require(msg.value > 0, "Amount must be greater than 0");
 
-        totalRaised += amount;
-        goalReached = totalRaised >= goal;
-        donations[msg.sender] += amount;
-        emit DonationReceived(msg.sender, amount);
+        totalRaised += msg.value;
+        donations[msg.sender] += msg.value;
+        emit DonationReceived(msg.sender, msg.value);
     }
 
-    function withdrawFunds() public payable onlyOwner notWithdrawn campaignNotEnded {
+    function withdrawFunds() public payable onlyOwner notWithdrawn campaignEnded {
+        goalReached = totalRaised >= goal;
         require(goalReached);
 
-        payable(msg.sender).transfer(totalRaised);
+        payable(owner).transfer(address(this).balance);
         fundsWithdrawn = true;
 
         emit FundsWithdrawn(msg.sender, totalRaised);
     }
 
-    function refund() payable public campaignNotEnded {
-        require(!goalReached);
+    function refund() payable public campaignEnded {
+        goalReached = totalRaised >= goal;
+        require(!goalReached, "Campaign goal reached");
 
         uint amount = donations[msg.sender];
         require(amount > 0, "No donation to refund");
