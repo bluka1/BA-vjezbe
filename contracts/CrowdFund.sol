@@ -9,6 +9,15 @@ contract CrowdFund {
     bool public goalReached;
     bool public fundsWithdrawn;
     mapping(address => uint) public donations;
+    Campaign[] public campaigns;
+
+    struct Campaign {
+        string name;
+        uint goal;
+        uint deadline;
+        uint totalRaised;
+        mapping(address => uint) donations;
+    }
 
     event DonationReceived(address donor, uint amount);
     event FundsWithdrawn(address owner, uint amount);
@@ -39,6 +48,25 @@ contract CrowdFund {
         goal = _goal * 1e18;
         deadline = block.timestamp + (_durationMinutes * 60);
         owner = msg.sender;
+    }
+
+    function createCampaign(string memory _title, uint _goal, uint _durationMinutes) public {
+        campaigns.push();
+        Campaign storage c = campaigns[campaigns.length - 1];
+        c.name = _title;
+        c.goal = _goal * 1e18;
+        c.totalRaised = 0;
+        c.deadline = block.timestamp + (_durationMinutes * 1 minutes);
+    }
+
+    function donateTo(uint campaignId) payable public {
+        Campaign storage c = campaigns[campaignId];
+        c.donations[msg.sender] += msg.value;
+        c.totalRaised += msg.value;
+    }
+
+    function getBalanceForCampaign(uint cId) public view returns (uint) {
+        return campaigns[cId].totalRaised;
     }
 
     function donate() payable public campaignNotEnded {
